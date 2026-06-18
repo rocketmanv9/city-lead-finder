@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>City Lead Finder — Report</title>
+<style>
+  :root {
+    --bg: #0f172a; --panel: #1e293b; --panel2: #273449; --line: #334155;
+    --ink: #e2e8f0; --muted: #94a3b8; --accent: #f59e0b; --accent2: #fbbf24;
+    --hot: #ef4444; --warm: #f59e0b; --cold: #64748b; --good: #22c55e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink); display: flex; flex-direction: column;
+    font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  header.top {
+    display: flex; align-items: center; gap: 14px; padding: 14px 20px;
+    background: linear-gradient(90deg, #1e293b, #0f172a); border-bottom: 2px solid var(--accent);
+  }
+  header.top .logo { width: 34px; height: 34px; border-radius: 8px; flex: none;
+    background: repeating-linear-gradient(45deg, var(--accent) 0 8px, #1e293b 8px 16px); }
+  header.top h1 { font-size: 18px; margin: 0; letter-spacing: .3px; }
+  header.top .sub { color: var(--muted); font-size: 13px; }
+  header.top .spacer { flex: 1; }
+  .btn { background: var(--accent); color: #1a1206; border: none; border-radius: 8px;
+    padding: 9px 14px; font-weight: 600; font-size: 14px; cursor: pointer; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .btn:hover { filter: brightness(1.08); }
+  .layout { flex: 1; display: flex; min-height: 0; }
+  aside { width: 270px; flex: none; background: var(--panel); border-right: 1px solid var(--line);
+    overflow-y: auto; padding: 14px; }
+  aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 4px 0 10px; }
+  .file { padding: 9px 11px; border-radius: 8px; cursor: pointer; margin-bottom: 5px;
+    display: flex; align-items: center; gap: 9px; border: 1px solid transparent; font-size: 14px; }
+  .file:hover { background: var(--panel2); }
+  .file.active { background: var(--panel2); border-color: var(--accent); }
+  .file .ext { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 5px; flex: none; }
+  .file .ext.csv { background: #166534; color: #dcfce7; }
+  .file .ext.md  { background: #1e40af; color: #dbeafe; }
+  .file .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  main { flex: 1; overflow: auto; padding: 22px 26px; min-width: 0; }
+
+  .drop { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center;
+    margin: 26px; border: 2px dashed var(--line); border-radius: 16px; color: var(--muted); }
+  .drop.hot { border-color: var(--accent); background: rgba(245,158,11,.06); color: var(--ink); }
+  .drop .big { font-size: 22px; color: var(--ink); margin-bottom: 8px; }
+  .drop kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; }
+
+  /* report header */
+  .rpt-head { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .rpt-head .title { font-size: 26px; font-weight: 700; }
+  .rpt-head .meta { color: var(--muted); font-size: 14px; }
+  .views { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .views button { background: transparent; color: var(--muted); border: none; padding: 8px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .views button.on { background: var(--accent); color: #1a1206; }
+
+  .banner { background: rgba(245,158,11,.12); border: 1px solid var(--accent); border-radius: 10px;
+    padding: 12px 16px; margin-bottom: 18px; font-size: 14px; }
+
+  /* stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .tile .n { font-size: 30px; font-weight: 800; line-height: 1; }
+  .tile .l { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-top: 8px; }
+  .tile.hot .n { color: var(--hot); } .tile.warm .n { color: var(--warm); } .tile.cold .n { color: var(--cold); }
+  .tile .bar { height: 6px; border-radius: 4px; background: var(--panel2); margin-top: 9px; overflow: hidden; }
+  .tile .bar > i { display: block; height: 100%; background: var(--good); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+  @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .panel h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+
+  /* donut */
+  .donut-wrap { display: flex; align-items: center; gap: 22px; }
+  .donut-legend { font-size: 14px; } .donut-legend div { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .dot { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+
+  /* horizontal bars */
+  .hbar { margin: 9px 0; }
+  .hbar .row { display: flex; justify-content: space-between; font-size: 13.5px; margin-bottom: 3px; }
+  .hbar .track { height: 10px; border-radius: 5px; background: var(--panel2); overflow: hidden; }
+  .hbar .track > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+
+  /* histogram */
+  .histo { display: flex; align-items: flex-end; gap: 4px; height: 120px; }
+  .histo .col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
+  .histo .col > i { width: 100%; border-radius: 3px 3px 0 0; min-height: 2px; }
+  .histo .col span { font-size: 10px; color: var(--muted); }
+
+  /* top opportunity cards */
+  .opps { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .opp { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; border-left: 4px solid var(--warm); }
+  .opp.hot { border-left-color: var(--hot); } .opp.cold { border-left-color: var(--cold); }
+  .opp .nm { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+  .opp .sub { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+  .opp .sum { font-size: 13px; margin: 10px 0; }
+  .opp .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { font-size: 12px; padding: 4px 9px; border-radius: 7px; background: var(--panel2); color: var(--ink); text-decoration: none; border: 1px solid var(--line); cursor: pointer; }
+  .chip:hover { border-color: var(--accent); }
+  .score-pill { float: right; font-weight: 800; font-size: 18px; }
+  .score-pill.hot { color: var(--hot); } .score-pill.warm { color: var(--warm); } .score-pill.cold { color: var(--cold); }
+
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .toolbar input[type=search] { background: var(--panel); border: 1px solid var(--line); color: var(--ink);
+    border-radius: 8px; padding: 8px 12px; font-size: 14px; min-width: 240px; }
+  .count { color: var(--muted); font-size: 13px; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 11px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { position: sticky; top: 0; background: var(--panel2); cursor: pointer; user-select: none; white-space: nowrap; z-index: 1; }
+  th:hover { color: var(--accent2); }
+  th .arrow { color: var(--accent); font-size: 11px; }
+  tbody tr:hover { background: rgba(148,163,184,.07); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  a { color: var(--accent2); }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; }
+  .badge.hot { background: rgba(239,68,68,.18); color: #fca5a5; }
+  .badge.warm { background: rgba(245,158,11,.18); color: #fcd34d; }
+  .badge.cold { background: rgba(100,116,139,.22); color: #cbd5e1; }
+  .scorewrap { display: flex; align-items: center; gap: 8px; min-width: 90px; }
+  .scorebar { flex: 1; height: 7px; border-radius: 4px; background: var(--panel2); overflow: hidden; }
+  .scorebar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--cold), var(--accent), var(--hot)); }
+
+  .md { max-width: 900px; }
+  .md h1 { font-size: 26px; border-bottom: 2px solid var(--accent); padding-bottom: 8px; }
+  .md h2 { font-size: 19px; margin-top: 26px; color: var(--accent2); }
+  .md h3 { font-size: 16px; }
+  .md em { color: var(--muted); }
+  .md ul { padding-left: 20px; } .md li { margin: 3px 0; }
+  .md table { margin: 14px 0; }
+  .md code { background: var(--panel2); padding: 1px 6px; border-radius: 5px; font-size: 13px; }
+  .md hr { border: none; border-top: 1px solid var(--line); margin: 22px 0; }
+
+  @media print {
+    aside, header.top .btn, .toolbar, .views { display: none !important; }
+    body, main { background: #fff; color: #000; }
+    .layout { display: block; } aside { display: none; }
+    .panel, .tile, .opp { break-inside: avoid; }
+    th { background: #eee; color: #000; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="logo"></div>
+  <div>
+    <h1>City Lead Finder <span class="sub">— results report</span></h1>
+    <div class="sub" id="ctxLabel">Drop a results folder or file to begin</div>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn ghost" onclick="document.getElementById('fileInput').click()">Open files</button>
+  <button class="btn" onclick="document.getElementById('dirInput').click()">Open folder</button>
+  <button class="btn ghost" onclick="window.print()">Print</button>
+</header>
+
+<!--EMBED--><input id="fileInput" type="file" accept=".csv,.md,.markdown,.txt" multiple hidden />
+<input id="dirInput" type="file" webkitdirectory directory multiple hidden />
+
+<div class="layout">
+  <aside id="sidebar" style="display:none"><h2>Files</h2><div id="fileList"></div></aside>
+  <main id="main">
+    <div class="drop" id="drop"><div>
+      <div class="big">Drag a results folder here</div>
+      <div>…or any <strong>master.csv</strong>, <strong>*-report.md</strong>, or pipeline CSV.</div>
+      <div style="margin-top:14px">Or use <kbd>Open folder</kbd> / <kbd>Open files</kbd> above.</div>
+      <div style="margin-top:18px; font-size:13px">Your files never leave this computer — everything renders in the browser.</div>
+    </div></div>
+  </main>
+</div>
+
+<script>
+const state = { files: [], active: null };
+
+/* ---------- CSV parsing (handles quotes, commas, newlines, BOM) ---------- */
+function parseCSV(text) {
+  text = text.replace(/^﻿/, "");
+  const rows = []; let row = [], field = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i+1] === '"') { field += '"'; i++; } else q = false; } else field += c; }
+    else {
+      if (c === '"') q = true;
+      else if (c === ",") { row.push(field); field = ""; }
+      else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+      else if (c === "\r") {}
+      else field += c;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.length > 1 || (r.length === 1 && r[0].trim() !== ""));
+}
+
+/* ---------- tiny Markdown renderer ---------- */
+function escapeHtml(s){ return (s==null?"":String(s)).replace(/[&<>]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[m])); }
+function inline(s) {
+  s = escapeHtml(s);
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+  s = s.replace(/(^|[^_])_([^_]+)_/g, "$1<em>$2</em>");
+  return s;
+}
+function splitRow(line){ return line.replace(/^\||\|$/g, "").split(/(?<!\\)\|/).map(c => c.replace(/\\\|/g, "|").trim()); }
+function renderMarkdown(text) {
+  const lines = text.replace(/\r/g, "").split("\n"); let html = "", i = 0;
+  while (i < lines.length) {
+    let ln = lines[i];
+    if (/^\s*#{1,6}\s/.test(ln)) { const lvl = ln.match(/^\s*(#{1,6})/)[1].length;
+      html += `<h${lvl}>${inline(ln.replace(/^\s*#{1,6}\s/, ""))}</h${lvl}>`; i++; continue; }
+    if (/^\s*([-*_])\1{2,}\s*$/.test(ln)) { html += "<hr>"; i++; continue; }
+    if (/^\s*\|.*\|\s*$/.test(ln) && i+1 < lines.length && /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[i+1])) {
+      const head = splitRow(ln); i += 2; const body = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) { body.push(splitRow(lines[i])); i++; }
+      html += "<table><thead><tr>" + head.map(h => `<th>${inline(h)}</th>`).join("") + "</tr></thead><tbody>"
+            + body.map(r => "<tr>" + r.map(c => `<td>${inline(c)}</td>`).join("") + "</tr>").join("") + "</tbody></table>"; continue; }
+    if (/^\s*[-*]\s/.test(ln)) { html += "<ul>";
+      while (i < lines.length && /^\s*[-*]\s/.test(lines[i])) { html += `<li>${inline(lines[i].replace(/^\s*[-*]\s/, ""))}</li>`; i++; }
+      html += "</ul>"; continue; }
+    if (ln.trim() === "") { i++; continue; }
+    let para = ln; i++;
+    while (i < lines.length && lines[i].trim() !== "" && !/^\s*(#{1,6}\s|[-*]\s|\|)/.test(lines[i])) { para += " " + lines[i]; i++; }
+    html += `<p>${inline(para)}</p>`;
+  }
+  return `<div class="md">${html}</div>`;
+}
+
+/* ---------- helpers ---------- */
+function pclass(p){ p=(p||"").toLowerCase(); return p==="hot"?"hot":p==="cold"?"cold":"warm"; }
+function titleFromPath(path) {
+  const folder = (path.split("/")[0] || "").trim();
+  const m = folder.match(/^(.+?)-([a-z]{2})-(\d{4}-\d{2}-\d{2})$/i);
+  if (m) { const city = m[1].replace(/-/g," ").replace(/\b\w/g, c=>c.toUpperCase());
+    return { title: `${city}, ${m[2].toUpperCase()}`, date: m[3] }; }
+  return { title: "Lead Report", date: "" };
+}
+function copy(t){ navigator.clipboard && navigator.clipboard.writeText(t); }
+function donut(segs, total) {
+  const r=52, c=2*Math.PI*r; let off=0;
+  const arcs = segs.map(s => { const len=total? c*s.value/total : 0; const el=`<circle r="${r}" cx="60" cy="60" fill="none"
+    stroke="${s.color}" stroke-width="16" stroke-dasharray="${len} ${c-len}" stroke-dashoffset="${-off}"></circle>`; off+=len; return el; }).join("");
+  return `<svg width="120" height="120" viewBox="0 0 120 120" style="transform:rotate(-90deg)">
+    <circle r="${r}" cx="60" cy="60" fill="none" stroke="var(--panel2)" stroke-width="16"></circle>${arcs}</svg>`;
+}
+
+/* ---------- leads dashboard ---------- */
+function renderLeads(file, headers, data) {
+  const H = n => headers.findIndex(h => n.test(h));
+  const iName=H(/business_name|^name/i), iPri=H(/^priority$/i), iScore=H(/opportunity_score|score/i),
+        iSvc=H(/recommended_service|suggested_service|service/i), iPhone=H(/phone/i), iEmail=H(/email/i),
+        iContact=H(/contact_name/i), iSite=H(/website|site/i), iSum=H(/sales_summary|sales_note|summary/i),
+        iAddr=H(/address/i), iLink=H(/linkedin/i);
+  const get=(d,i)=> i>=0 ? (d[headers[i]]||"") : "";
+  const meta = titleFromPath(file.path);
+
+  const counts={Hot:0,Warm:0,Cold:0};
+  data.forEach(d=>{ const k=get(d,iPri); const key=k?k[0].toUpperCase()+k.slice(1).toLowerCase():"Warm"; if(counts[key]!=null)counts[key]++; });
+  const scores = data.map(d=>parseFloat(get(d,iScore))).filter(n=>!isNaN(n));
+  const avg = scores.length? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0;
+  const pct = i => data.length? Math.round(100*data.filter(d=>get(d,i).trim()!=="").length/data.length):0;
+  const emailPct=pct(iEmail), phonePct=pct(iPhone), namePct=pct(iContact);
+  const placeholder = data.filter(d=>/not auto-researched|not scored/i.test(get(d,iSum))).length;
+
+  // service breakdown
+  const svc={}; data.forEach(d=> get(d,iSvc).split(",").map(s=>s.trim()).filter(Boolean).forEach(s=>svc[s]=(svc[s]||0)+1));
+  const svcTop = Object.entries(svc).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const svcMax = svcTop.length? svcTop[0][1]:1;
+
+  // histogram (10-pt buckets)
+  const buckets = new Array(10).fill(0);
+  scores.forEach(s=>{ const b=Math.min(9,Math.max(0,Math.floor(s/10))); buckets[b]++; });
+  const hMax = Math.max(1, ...buckets);
+  const bColor = b => b>=8? "var(--hot)" : b>=5? "var(--accent)" : "var(--cold)";
+
+  // top opportunities
+  const top = [...data].map(d=>({d, s:parseFloat(get(d,iScore))||0})).sort((a,b)=>b.s-a.s).slice(0,6);
+
+  const banner = placeholder/Math.max(1,data.length) > 0.5
+    ? `<div class="banner">⚠ <strong>This looks like placeholder data.</strong> ${placeholder} of ${data.length} leads weren't actually scored by the AI (they show a default "Warm / 50"). Re-run with a funded API key for real Hot/Warm/Cold analysis.</div>` : "";
+
+  const dash = `
+    ${banner}
+    <div class="tiles">
+      <div class="tile"><div class="n">${data.length}</div><div class="l">Total leads</div></div>
+      <div class="tile hot"><div class="n">${counts.Hot}</div><div class="l">🔥 Hot</div></div>
+      <div class="tile warm"><div class="n">${counts.Warm}</div><div class="l">Warm</div></div>
+      <div class="tile cold"><div class="n">${counts.Cold}</div><div class="l">Cold</div></div>
+      <div class="tile"><div class="n">${avg}</div><div class="l">Avg score</div></div>
+      <div class="tile"><div class="n">${emailPct}%</div><div class="l">Have email</div><div class="bar"><i style="width:${emailPct}%"></i></div></div>
+      <div class="tile"><div class="n">${phonePct}%</div><div class="l">Have phone</div><div class="bar"><i style="width:${phonePct}%"></i></div></div>
+      <div class="tile"><div class="n">${namePct}%</div><div class="l">Named contact</div><div class="bar"><i style="width:${namePct}%"></i></div></div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h3>Priority mix</h3><div class="donut-wrap">
+        ${donut([{value:counts.Hot,color:"var(--hot)"},{value:counts.Warm,color:"var(--warm)"},{value:counts.Cold,color:"var(--cold)"}], data.length)}
+        <div class="donut-legend">
+          <div><span class="dot" style="background:var(--hot)"></span> Hot — ${counts.Hot}</div>
+          <div><span class="dot" style="background:var(--warm)"></span> Warm — ${counts.Warm}</div>
+          <div><span class="dot" style="background:var(--cold)"></span> Cold — ${counts.Cold}</div>
+        </div></div></div>
+      <div class="panel"><h3>Score distribution</h3><div class="histo">
+        ${buckets.map((n,b)=>`<div class="col" title="${b*10}–${b*10+9}: ${n}"><i style="height:${Math.round(100*n/hMax)}%;background:${bColor(b)}"></i><span>${b*10}</span></div>`).join("")}
+      </div></div>
+    </div>
+    ${svcTop.length? `<div class="panel" style="margin-bottom:18px"><h3>Recommended services</h3>
+      ${svcTop.map(([s,n])=>`<div class="hbar"><div class="row"><span>${escapeHtml(s)}</span><span>${n}</span></div><div class="track"><i style="width:${Math.round(100*n/svcMax)}%"></i></div></div>`).join("")}
+    </div>`:""}
+    <h3 style="text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-size:14px">Top opportunities</h3>
+    <div class="opps">${top.map(({d,s})=>{
+      const cls=pclass(get(d,iPri)), phone=get(d,iPhone), email=get(d,iEmail), site=get(d,iSite);
+      return `<div class="opp ${cls}">
+        <span class="score-pill ${cls}">${s||"—"}</span>
+        <div class="nm">${escapeHtml(get(d,iName))||"(unnamed)"}</div>
+        <div class="sub">${escapeHtml(get(d,iSvc))||"—"} · <span class="badge ${cls}">${escapeHtml(get(d,iPri)||"—")}</span></div>
+        <div class="sum">${escapeHtml((get(d,iSum)||"").slice(0,160))}</div>
+        <div class="acts">
+          ${phone?`<a class="chip" href="tel:${escapeHtml(phone.replace(/[^+\d]/g,""))}">📞 ${escapeHtml(phone)}</a>`:""}
+          ${email?`<a class="chip" href="mailto:${escapeHtml(email)}">✉ email</a>`:""}
+          ${site?`<a class="chip" href="${escapeHtml(/^https?:/.test(site)?site:"https://"+site)}" target="_blank" rel="noopener">🌐 site</a>`:""}
+        </div></div>`; }).join("")}</div>`;
+
+  // table view (sortable / filterable)
+  function tableView(container) {
+    container.innerHTML = `<div class="toolbar">
+        <input type="search" id="q" placeholder="Filter ${data.length} leads…" />
+        <button class="btn ghost" id="dl">⬇ Download filtered CSV</button>
+        <span class="count" id="cnt"></span></div>
+      <div style="overflow:auto"><table id="tbl"><thead><tr>${
+        headers.map((h,j)=>`<th data-j="${j}">${escapeHtml(h)} <span class="arrow"></span></th>`).join("")
+      }</tr></thead><tbody></tbody></table></div>`;
+    let sortJ = iScore>=0?iScore:-1, sortDir=-1, filter="";
+    const numeric = j => data.every(d => d[headers[j]]==="" || !isNaN(parseFloat(d[headers[j]])));
+    let view = data;
+    function compute(){ view = data;
+      if (filter){ const f=filter.toLowerCase(); view=view.filter(d=>headers.some(h=>(d[h]||"").toLowerCase().includes(f))); }
+      if (sortJ>=0){ const h=headers[sortJ], num=numeric(sortJ);
+        view=[...view].sort((a,b)=>{ let x=a[h],y=b[h]; if(num){x=parseFloat(x)||0;y=parseFloat(y)||0;return (x-y)*sortDir;} return x.localeCompare(y)*sortDir; }); } }
+    function draw(){ compute();
+      container.querySelector("#tbl tbody").innerHTML = view.map(d=>"<tr>"+headers.map((h,j)=>{
+        let v=d[h]??"";
+        if(j===iPri) return `<td><span class="badge ${pclass(v)}">${escapeHtml(v||"—")}</span></td>`;
+        if(j===iScore && v!==""){ const n=Math.max(0,Math.min(100,parseFloat(v)||0));
+          return `<td><div class="scorewrap"><b>${escapeHtml(v)}</b><div class="scorebar"><i style="width:${n}%"></i></div></div></td>`; }
+        if(/^https?:\/\//i.test(v)) return `<td><a href="${escapeHtml(v)}" target="_blank" rel="noopener">${escapeHtml(v.replace(/^https?:\/\/(www\.)?/,""))}</a></td>`;
+        if(j===iEmail && /@/.test(v)) return `<td><a href="mailto:${escapeHtml(v)}">${escapeHtml(v)}</a></td>`;
+        if(j===iPhone && v) return `<td><a href="tel:${escapeHtml(v.replace(/[^+\d]/g,""))}">${escapeHtml(v)}</a></td>`;
+        return `<td class="${numeric(j)&&v!==''?'num':''}">${escapeHtml(v)}</td>`;
+      }).join("")+"</tr>").join("");
+      container.querySelector("#cnt").textContent = `${view.length} of ${data.length} shown`;
+      container.querySelectorAll("#tbl th .arrow").forEach((a,j)=> a.textContent = j===sortJ?(sortDir>0?"▲":"▼"):"");
+    }
+    container.querySelectorAll("#tbl th").forEach(th=> th.onclick=()=>{ const j=+th.dataset.j; if(sortJ===j)sortDir*=-1; else{sortJ=j;sortDir=1;} draw(); });
+    container.querySelector("#q").oninput = e=>{ filter=e.target.value; draw(); };
+    container.querySelector("#dl").onclick = ()=>{ compute();
+      const csv=[headers.join(","),...view.map(d=>headers.map(h=>{const v=(d[h]||"");return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}).join(","))].join("\n");
+      const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+      a.download="filtered-leads.csv"; a.click(); };
+    draw();
+  }
+
+  const main = document.getElementById("main");
+  main.innerHTML = `
+    <div class="rpt-head">
+      <div><div class="title">${escapeHtml(meta.title)}</div>
+        <div class="meta">${data.length} leads${meta.date?` · generated ${meta.date}`:""} · ${escapeHtml(file.name)}</div></div>
+      <div class="spacer" style="flex:1"></div>
+      <div class="views"><button class="on" data-v="dash">Dashboard</button><button data-v="table">Table</button></div>
+    </div>
+    <div id="content"></div>`;
+  const content = main.querySelector("#content");
+  function show(v){ main.querySelectorAll(".views button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+    if(v==="dash") content.innerHTML = dash; else tableView(content); }
+  main.querySelectorAll(".views button").forEach(b=> b.onclick=()=>show(b.dataset.v));
+  show("dash");
+}
+
+/* ---------- generic CSV (non-leads, e.g. pipeline) ---------- */
+function renderGenericCSV(headers, data) {
+  const main = document.getElementById("main");
+  main.innerHTML = `<div class="toolbar"><input type="search" id="q" placeholder="Filter ${data.length} rows…"/><span class="count" id="cnt"></span></div>
+    <div style="overflow:auto"><table id="tbl"><thead><tr>${headers.map((h,j)=>`<th data-j="${j}">${escapeHtml(h)} <span class="arrow"></span></th>`).join("")}</tr></thead><tbody></tbody></table></div>`;
+  let sortJ=-1, sortDir=1, filter="";
+  const numeric=j=>data.every(d=>d[headers[j]]===""||!isNaN(parseFloat(d[headers[j]])));
+  function draw(){ let view=data;
+    if(filter){const f=filter.toLowerCase();view=view.filter(d=>headers.some(h=>(d[h]||"").toLowerCase().includes(f)));}
+    if(sortJ>=0){const h=headers[sortJ],num=numeric(sortJ);view=[...view].sort((a,b)=>{let x=a[h],y=b[h];if(num){x=parseFloat(x)||0;y=parseFloat(y)||0;return(x-y)*sortDir;}return x.localeCompare(y)*sortDir;});}
+    document.querySelector("#tbl tbody").innerHTML=view.map(d=>"<tr>"+headers.map((h,j)=>{let v=d[h]??"";
+      if(/^https?:\/\//i.test(v))return`<td><a href="${escapeHtml(v)}" target="_blank" rel="noopener">${escapeHtml(v.replace(/^https?:\/\/(www\.)?/,""))}</a></td>`;
+      return`<td class="${numeric(j)&&v!==''?'num':''}">${escapeHtml(v)}</td>`;}).join("")+"</tr>").join("");
+    document.getElementById("cnt").textContent=`${view.length} of ${data.length} shown`;
+    document.querySelectorAll("#tbl th .arrow").forEach((a,j)=>a.textContent=j===sortJ?(sortDir>0?"▲":"▼"):"");}
+  document.querySelectorAll("#tbl th").forEach(th=>th.onclick=()=>{const j=+th.dataset.j;if(sortJ===j)sortDir*=-1;else{sortJ=j;sortDir=1;}draw();});
+  document.getElementById("q").oninput=e=>{filter=e.target.value;draw();};
+  draw();
+}
+
+function renderCSV(file) {
+  const rows = parseCSV(file.text);
+  if (!rows.length) { document.getElementById("main").innerHTML="<p>Empty CSV.</p>"; return; }
+  const headers = rows[0];
+  const data = rows.slice(1).map(r=>{ const o={}; headers.forEach((h,j)=>o[h]=r[j]??""); return o; });
+  if (headers.some(h=>/^priority$/i.test(h))) renderLeads(file, headers, data);
+  else renderGenericCSV(headers, data);
+}
+
+function renderActive() {
+  const f = state.files[state.active];
+  document.getElementById("ctxLabel").textContent = f.path;
+  if (/\.(md|markdown|txt)$/i.test(f.name)) document.getElementById("main").innerHTML = renderMarkdown(f.text);
+  else renderCSV(f);
+  [...document.querySelectorAll(".file")].forEach((el,i)=> el.classList.toggle("active", i===state.active));
+}
+function rankFile(name){ if(/master\.csv$/i.test(name))return 0; if(/top-?25|report\.md$/i.test(name))return 1;
+  if(/call-?sheet/i.test(name))return 2; if(/\.csv$/i.test(name))return 3; return 4; }
+function loadFiles(list) {
+  state.files = list.sort((a,b)=> rankFile(a.name)-rankFile(b.name) || a.path.localeCompare(b.path));
+  document.getElementById("sidebar").style.display = "block";
+  document.getElementById("fileList").innerHTML = state.files.map((f,i)=>{
+    const ext=/\.csv$/i.test(f.name)?"csv":"md";
+    return `<div class="file" data-i="${i}"><span class="ext ${ext}">${ext.toUpperCase()}</span><span class="nm" title="${f.path}">${f.name}</span></div>`;
+  }).join("");
+  document.querySelectorAll(".file").forEach(el=> el.onclick=()=>{ state.active=+el.dataset.i; renderActive(); });
+  state.active = 0; renderActive();
+}
+
+/* ---------- file intake ---------- */
+const SUPPORTED = /\.(csv|md|markdown|txt)$/i;
+async function readFileObj(file, path){ return { name:file.name, path:path||file.name, text:await file.text() }; }
+async function fromInput(fileList){ const out=[];
+  for(const f of fileList) if(SUPPORTED.test(f.name)) out.push(await readFileObj(f, f.webkitRelativePath||f.name));
+  if(out.length) loadFiles(out); else alert("No .csv or .md files found there."); }
+document.getElementById("fileInput").onchange = e=>fromInput(e.target.files);
+document.getElementById("dirInput").onchange  = e=>fromInput(e.target.files);
+function walkEntry(entry, path, acc){ return new Promise(resolve=>{
+  if(entry.isFile) entry.file(f=>{ if(SUPPORTED.test(f.name)) acc.push(readFileObj(f, path+f.name)); resolve(); });
+  else { const reader=entry.createDirectoryReader(); const all=[];
+    const readBatch=()=>reader.readEntries(async ents=>{ if(!ents.length){ await Promise.all(all.map(en=>walkEntry(en,path+entry.name+"/",acc))); resolve(); }
+      else { all.push(...ents); readBatch(); } }); readBatch(); } }); }
+const drop=document.getElementById("drop");
+function setHot(on){ if(drop) drop.classList.toggle("hot",on); }
+["dragenter","dragover"].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();setHot(true);}));
+["dragleave","drop"].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();if(ev==="dragleave"&&e.relatedTarget)return;setHot(false);}));
+document.addEventListener("drop", async e=>{ e.preventDefault(); setHot(false);
+  const items=e.dataTransfer.items; const promises=[];
+  if(items&&items.length&&items[0].webkitGetAsEntry){ const entries=[...items].map(it=>it.webkitGetAsEntry()).filter(Boolean);
+    for(const en of entries) await walkEntry(en,"",promises);
+    const files=await Promise.all(promises); if(files.length) return loadFiles(files); }
+  fromInput(e.dataTransfer.files); });
+
+// If generated with data baked in (share build), load automatically.
+if (window.__EMBEDDED && window.__EMBEDDED.length) loadFiles(window.__EMBEDDED);
+</script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+================================================================================
+                       CITY LEAD FINDER  —  HOW TO USE
+                  Local tool for AC Moate pavement sales leads
+================================================================================
+
+WHAT IT IS
+  A tool that runs on YOUR computer. You give it a city + state, and it builds a
+  spreadsheet (CSV) of businesses that likely need pavement / parking-lot work
+  (asphalt, concrete, sealcoat, crackfill, striping, sweeping, snow/ice).
+
+  There is NO website or app window. It is run entirely from the terminal
+  (PowerShell). You type a command, it works for a minute or two, and it saves
+  spreadsheet files you open in Excel / Google Sheets.
+
+  Everything stays on your machine. No login, no database, no monthly fee — you
+  only pay the per-run cost of the data + AI services (see COSTS below).
+
+
+--------------------------------------------------------------------------------
+ONE-TIME SETUP  (already done on this computer)
+--------------------------------------------------------------------------------
+  Your API keys are saved in the file ".env". The tool is ready to run.
+  If you move it to a new computer: install Node.js (nodejs.org), then in this
+  folder run:  npm install
+
+
+--------------------------------------------------------------------------------
+HOW TO RUN A COMMAND
+--------------------------------------------------------------------------------
+  1. Open PowerShell.
+  2. Go to the project folder:
+         cd C:\Users\grant\city-lead-finder
+  3. Type one of the commands below and press Enter.
+
+  If you leave out the city/state, it will simply ask you for them.
+
+
+--------------------------------------------------------------------------------
+THE COMMANDS  (what each one does)
+--------------------------------------------------------------------------------
+
+1) npm run find
+   THE BASIC ONE. Finds businesses in a city and scores each 1-100 for how
+   likely it needs pavement work. Saves one spreadsheet.
+       npm run find -- --city "Columbus" --state "OH" --max 10
+   Output: out\columbus-oh-leads-<date>.csv  (sorted best leads first)
+
+
+2) npm run enrich
+   ADD CONTACT PEOPLE. Takes a leads file and finds decision-maker names,
+   emails, phones, and LinkedIn (property managers, public works directors, etc).
+       npm run enrich
+   Output: out\<name>-contacts.csv
+
+
+3) npm run research
+   ADD SALES INTELLIGENCE. For each lead, writes a short sales summary, the
+   services to pitch, who to contact first, and why it's a priority.
+       npm run research
+   Output: out\<name>-research.csv
+
+
+4) npm run hunt    *** THE ALL-IN-ONE — USE THIS ONE MOST ***
+   Runs EVERYTHING above end to end for a city, and gives you a finished
+   prospecting package in one folder.
+       npm run hunt -- --city "Columbus" --state "OH" --max 10
+   Output folder: out\columbus-oh-<date>\  containing:
+       - master.csv .............. every lead, ranked, with contacts + scores
+       - top-25-report.md ........ write-ups of your 25 best opportunities
+       - sales-call-sheet.md ..... printable phone-call sheet (name/phone/notes)
+
+
+5) npm run estimate
+   "FIND ME $1M OF OPPORTUNITY." Estimates the total dollar value of pavement
+   work available in a city. Cheap — does NOT use the AI, only the maps data.
+       npm run estimate -- --city "Hillsboro" --state "OR" --target 1M
+   Output: out\<city>-pipeline-<date>.csv
+
+
+--------------------------------------------------------------------------------
+USEFUL OPTIONS  (add these after the command)
+--------------------------------------------------------------------------------
+  --city "Columbus"          The city to search.
+  --state "OH"               The state.
+  --max 10                   How many results per search. Higher = more leads
+                             AND more cost. Start at 10. (default 20)
+  --types "apartments, warehouses, shopping centers"
+                             Only search certain property types instead of all 14.
+
+  EXAMPLE (small, cheap test run):
+      npm run hunt -- --city "Columbus" --state "OH" --max 5
+
+
+--------------------------------------------------------------------------------
+WHERE YOUR FILES GO
+--------------------------------------------------------------------------------
+  Everything saves into the "out" folder:
+      C:\Users\grant\city-lead-finder\out\
+  Open the .csv files in Excel or Google Sheets. Open the .md files in any
+  text editor or Word.
+
+
+--------------------------------------------------------------------------------
+WHICH AI IT USES  (and cost control)
+--------------------------------------------------------------------------------
+  The tool prints the AI it's using when it starts, e.g.:
+      LLM: deepseek (deepseek-chat)
+      LLM: openai (gpt-4o-mini)
+
+  - It uses DEEPSEEK if a DeepSeek key is in .env (much cheaper).
+  - Otherwise it uses OPENAI.
+  - DeepSeek needs a funded balance (platform.deepseek.com -> Top up). If it
+    shows "Insufficient Balance," either add funds or remove the DeepSeek key
+    from .env to fall back to OpenAI.
+
+
+--------------------------------------------------------------------------------
+COSTS  (rough — you only pay per run)
+--------------------------------------------------------------------------------
+  - Outscraper (the maps data): charged per result. The --max number is your
+    main cost dial.
+  - The AI (DeepSeek or OpenAI): charged per lead scored. DeepSeek is ~10-20x
+    cheaper than OpenAI.
+  - "npm run estimate" uses NO AI, so it's the cheapest way to scope a city.
+
+  Tip: always test a new city with --max 5 first to see the results before
+  doing a big run.
+
+================================================================================
+  Quick start:  open PowerShell  ->  cd C:\Users\grant\city-lead-finder
+                ->  npm run hunt -- --city "YOURCITY" --state "ST" --max 10
+                ->  open the new folder in  out\
+================================================================================

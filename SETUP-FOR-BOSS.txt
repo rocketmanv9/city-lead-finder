@@ -1,0 +1,108 @@
+================================================================================
+            CITY LEAD FINDER — SETUP GUIDE (for a new computer)
+================================================================================
+
+This tool runs on your own computer and turns a city + state into a spreadsheet
+of pavement / construction sales leads. It is run from the terminal (PowerShell);
+there is no app window. Results are saved as files you open in Excel / a browser.
+
+You'll do this ONCE (about 10 minutes), then you can run it anytime.
+
+
+--------------------------------------------------------------------------------
+STEP 1 — Install Node.js   (one time)
+--------------------------------------------------------------------------------
+  1. Go to:  https://nodejs.org
+  2. Download the "LTS" version and run the installer (click Next / accept defaults).
+  3. Done. (This is what lets the tool run.)
+
+
+--------------------------------------------------------------------------------
+STEP 2 — Unzip this folder
+--------------------------------------------------------------------------------
+  Right-click the .zip you received -> "Extract All" -> pick a spot you'll
+  remember, e.g.  C:\city-lead-finder
+  (Remember this folder location — you'll point the terminal at it.)
+
+
+--------------------------------------------------------------------------------
+STEP 3 — Open PowerShell IN that folder
+--------------------------------------------------------------------------------
+  Easiest way: open the unzipped folder in File Explorer, click the address bar,
+  type  powershell  and press Enter. A blue/black terminal window opens, already
+  pointed at the folder.
+
+
+--------------------------------------------------------------------------------
+STEP 4 — Install the tool's parts   (one time)
+--------------------------------------------------------------------------------
+  In that PowerShell window, type this and press Enter:
+
+      npm install
+
+  Wait for it to finish (a minute or two). You only ever do this once.
+
+
+--------------------------------------------------------------------------------
+STEP 5 — Add your API keys   (one time)
+--------------------------------------------------------------------------------
+  The tool needs two paid services. Sign up and copy each key:
+
+    * Outscraper (the maps data):  https://app.outscraper.com/profile
+    * OpenAI (the AI scoring):     https://platform.openai.com/api-keys
+      -> IMPORTANT: OpenAI requires a small prepaid balance. Add ~$5-$10 at
+         https://platform.openai.com/account/billing  or scoring won't run.
+
+  Now create your settings file:
+    1. In the folder, find the file called  .env.example
+    2. Make a COPY of it and rename the copy to exactly  .env
+       (In PowerShell you can do:   copy .env.example .env )
+    3. Open  .env  in Notepad and paste your keys after the = signs, e.g.:
+
+         OUTSCRAPER_API_KEY=your_outscraper_key
+         OPENAI_API_KEY=your_openai_key
+
+    4. Save and close.
+
+  (Optional: a HUNTER_API_KEY adds contact emails. It works fine without it.)
+
+
+--------------------------------------------------------------------------------
+STEP 6 — Run it!
+--------------------------------------------------------------------------------
+  In PowerShell, type (change the city/state to what you want):
+
+      npm run hunt -- --city "Columbus" --state "OH" --max 10
+
+  It will print its progress. When done it saves a folder inside  out\  with:
+      - master.csv ............ all leads, ranked, with contacts + scores
+      - top-25-report.md ...... write-ups of the 25 best opportunities
+      - sales-call-sheet.md ... a printable phone-call list
+
+  Tip: start with  --max 5  to do a quick, cheap test of a new city.
+
+
+--------------------------------------------------------------------------------
+STEP 7 — View the results nicely
+--------------------------------------------------------------------------------
+  Double-click  viewer.html  (it opens in your browser). Then drag the new
+  folder from  out\  onto the page. You get a visual dashboard: Hot/Warm/Cold
+  counts, charts, top opportunities, and a sortable lead table.
+
+
+--------------------------------------------------------------------------------
+ALL THE COMMANDS  (see HOW-TO-USE.txt for full details)
+--------------------------------------------------------------------------------
+  npm run hunt      The all-in-one. Finds + scores + contacts + reports.  <-- use this
+  npm run find      Just find & score leads -> one CSV.
+  npm run enrich    Add decision-maker contacts to a leads CSV.
+  npm run research  Add AI sales summaries.
+  npm run estimate  Estimate total $ opportunity in a city (no AI = cheapest).
+  npm run share     Bundle a results folder into ONE shareable .html file.
+
+================================================================================
+  Quick version after setup:
+    1) open the folder, type powershell in the address bar
+    2) npm run hunt -- --city "YOURCITY" --state "ST" --max 10
+    3) double-click viewer.html and drag the new out\ folder onto it
+================================================================================
