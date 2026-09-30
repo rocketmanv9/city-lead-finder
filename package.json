@@ -15,6 +15,7 @@
     "hunt": "tsx src/hunt/index.ts",
     "estimate": "tsx src/estimate/index.ts",
     "share": "node make-share.mjs",
+    "fieldloop": "node to-fieldloop.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -131,3 +131,14 @@ COSTS  (rough — you only pay per run)
                 ->  npm run hunt -- --city "YOURCITY" --state "ST" --max 10
                 ->  open the new folder in  out\
 ================================================================================
+
+--------------------------------------------------------------------------------
+SEND LEADS INTO FIELDLOOP
+--------------------------------------------------------------------------------
+  npm run fieldloop -- --in out\<leads-file>.csv
+  npm run fieldloop -- --in "GC Leads.csv" --type general_contractor
+
+  Writes <leads-file>-fieldloop.csv next to the input. Open Fieldloop -> AI ->
+  Run now -> paste that file's contents into "Paste a list" -> Run. Every row
+  becomes a property + opportunity, deduped, geocoded and scored by Fieldloop's
+  own rules; outreach is drafted if your automation allows it.
