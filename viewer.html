@@ -125,6 +125,61 @@
   .scorebar { flex: 1; height: 7px; border-radius: 4px; background: var(--panel2); overflow: hidden; }
   .scorebar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--cold), var(--accent), var(--hot)); }
 
+  /* ---- notes & status (auto-saved in this browser) ---- */
+  .note-in { width: 100%; min-width: 150px; max-width: 320px; background: var(--bg); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; font: 13px/1.4 inherit; resize: vertical; overflow: hidden; }
+  .note-in:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px rgba(245,158,11,.18); }
+  .note-in::placeholder { color: var(--muted); }
+  .status-sel { background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 7px; padding: 6px 8px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .status-sel:focus { border-color: var(--accent); outline: none; }
+  tr[data-status="Contacted"] td { background: rgba(245,158,11,.07); }
+  tr[data-status="Quoted"]    td { background: rgba(59,130,246,.09); }
+  tr[data-status="Won"]       td { background: rgba(34,197,94,.12); }
+  tr[data-status="Lost"]      td,
+  tr[data-status="Skip"]      td { opacity: .5; }
+  th.colNotes, th.colStatus { color: var(--accent2); }
+
+  /* keep the leads table inside its own scroll box so the horizontal scrollbar is
+     always reachable and the header stays pinned, instead of running off-screen */
+  .tablewrap { overflow: auto; max-height: calc(100vh - 235px); border: 1px solid var(--line); border-radius: 10px; }
+  .tablewrap::-webkit-scrollbar { height: 14px; width: 14px; }
+  .tablewrap::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 8px; border: 3px solid var(--panel); }
+  .tablewrap::-webkit-scrollbar-track { background: var(--panel2); }
+  /* columns size to their content (no squishing); only long narrative columns wrap */
+  #tbl { table-layout: auto; }
+  #tbl th, #tbl td { white-space: nowrap; }
+  #tbl td.wrap { white-space: normal; min-width: 240px; max-width: 380px; overflow-wrap: anywhere; }
+  #tbl td.wrap, #tbl th { vertical-align: top; }
+
+  /* drag-to-resize columns */
+  #tbl th { position: relative; }
+  #tbl.fixed { table-layout: fixed; width: auto; }
+  #tbl.fixed td { overflow: hidden; text-overflow: ellipsis; }
+  #tbl.fixed td.wrap { overflow: visible; text-overflow: clip; min-width: 0; max-width: none; }
+  .col-resizer { position: absolute; top: 0; right: 0; width: 7px; height: 100%; cursor: col-resize; user-select: none; z-index: 2; }
+  .col-resizer:hover, .col-resizer.dragging { background: var(--accent); }
+
+  /* ---- work-tracker (live progress as the crew flips statuses) ---- */
+  .worktrack { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: var(--panel);
+    border: 1px solid var(--line); border-left: 4px solid var(--good); border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; }
+  .worktrack .big { font-size: 20px; font-weight: 800; white-space: nowrap; }
+  .worktrack .big b { color: var(--good); font-size: 24px; }
+  .worktrack .big .savehint { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .worktrack .pbar { flex: 1; min-width: 160px; height: 14px; border-radius: 8px; background: var(--panel2); overflow: hidden; }
+  .worktrack .pbar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--good)); transition: width .35s ease; }
+  .wchip { font-size: 13px; padding: 4px 11px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); font-weight: 700; white-space: nowrap; }
+  .wchip.contacted { color: #fcd34d; } .wchip.quoted { color: #93c5fd; } .wchip.won { color: #86efac; } .wchip.lost { color: var(--muted); }
+  .celebrate { color: var(--good); font-weight: 800; white-space: nowrap; }
+  .savehint { font-size: 12px; color: var(--muted); }
+
+  /* contact line on opportunity cards */
+  .opp .contact { font-size: 13px; margin: 2px 0 8px; }
+  .opp .contact .ttl { color: var(--muted); }
+  .opp .note-wrap { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 10px; }
+  .opp .note-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .opp .note-row .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+
   .md { max-width: 900px; }
   .md h1 { font-size: 26px; border-bottom: 2px solid var(--accent); padding-bottom: 8px; }
   .md h2 { font-size: 19px; margin-top: 26px; color: var(--accent2); }
@@ -175,6 +230,62 @@
 <script>
 const state = { files: [], active: null };
 
+/* ---------- per-lead notes & status — saved in THIS browser, survive reloads ----------
+   Keyed by business name + a discriminator (phone/site/address) so the same business
+   keeps its notes across the find CSV, the contacts CSV, and the hunt master.csv.     */
+const NOTES_KEY = "clf-notes-v1";
+const STATUSES = ["", "Contacted", "Quoted", "Won", "Lost", "Skip"];
+function loadNotes(){ try { return JSON.parse(localStorage.getItem(NOTES_KEY) || "{}"); } catch { return {}; } }
+function saveNotesStore(){ try { localStorage.setItem(NOTES_KEY, JSON.stringify(notesStore)); } catch {} }
+const notesStore = loadNotes();
+function leadKey(name, extra){ return ((name||"").trim().toLowerCase() + "|" + (extra||"").trim().toLowerCase()).replace(/\s+/g," "); }
+function getNote(key){ return notesStore[key] || { note:"", status:"" }; }
+function setNote(key, patch){ const cur = getNote(key); notesStore[key] = { note:cur.note, status:cur.status, ...patch }; saveNotesStore(); }
+function statusOptions(sel){ return STATUSES.map(s=>`<option value="${s}"${s===sel?" selected":""}>${s||"— New —"}</option>`).join(""); }
+function autoGrow(t){ t.style.height="auto"; t.style.height=Math.min(220, t.scrollHeight)+"px"; }
+
+/* ---------- saved column widths (drag-to-resize, survive reloads) ---------- */
+const COLW_KEY = "clf-colw-v1";
+function loadColW(){ try { return JSON.parse(localStorage.getItem(COLW_KEY) || "{}"); } catch { return {}; } }
+const colWStore = loadColW();
+function saveColWStore(){ try { localStorage.setItem(COLW_KEY, JSON.stringify(colWStore)); } catch {} }
+
+/* Build the live "worked" progress bar from the current rows. */
+function buildWorktrack(rows, keyOf){
+  const total=rows.length; let contacted=0,quoted=0,won=0,lost=0,worked=0;
+  rows.forEach(d=>{ const s=getNote(keyOf(d)).status; if(s)worked++;
+    if(s==="Contacted")contacted++; else if(s==="Quoted")quoted++; else if(s==="Won")won++; else if(s==="Lost"||s==="Skip")lost++; });
+  const pct=total?Math.round(100*worked/total):0;
+  return `<div class="big"><b>${worked}</b> / ${total} worked <span class="savehint">${pct}%</span></div>
+    <div class="pbar"><i style="width:${pct}%"></i></div>
+    <span class="wchip contacted">📞 ${contacted} contacted</span>
+    <span class="wchip quoted">📋 ${quoted} quoted</span>
+    <span class="wchip won">✅ ${won} won</span>
+    <span class="wchip lost">🚫 ${lost} out</span>
+    ${won>0?`<span class="celebrate">🎉 nice — ${won} won!</span>`:""}`;
+}
+
+/* Attach note/status handlers once to a container (event-delegated, survives re-renders). */
+function wireNotes(el){
+  if (el.__notesWired) return; el.__notesWired = true;
+  el.addEventListener("input", e=>{ const t=e.target;
+    if (t.classList && t.classList.contains("note-in")) { setNote(t.dataset.key, { note:t.value }); autoGrow(t); } });
+  el.addEventListener("change", e=>{ const t=e.target;
+    if (t.classList && t.classList.contains("status-sel")) {
+      setNote(t.dataset.key, { status:t.value });
+      const tr=t.closest("tr"); if(tr) tr.dataset.status=t.value;
+      const card=t.closest(".opp"); if(card) card.dataset.status=t.value;
+      if (typeof el.__statsUpdate === "function") el.__statsUpdate();
+    } });
+}
+
+/* Refresh editable fields from the store (used when re-showing a view). */
+function syncNotes(container){
+  container.querySelectorAll(".note-in").forEach(t=>{ t.value=getNote(t.dataset.key).note; autoGrow(t); });
+  container.querySelectorAll(".status-sel").forEach(s=>{ const st=getNote(s.dataset.key).status; s.value=st;
+    const tr=s.closest("tr"); if(tr) tr.dataset.status=st; const c=s.closest(".opp"); if(c) c.dataset.status=st; });
+}
+
 /* ---------- CSV parsing (handles quotes, commas, newlines, BOM) ---------- */
 function parseCSV(text) {
   text = text.replace(/^﻿/, "");
@@ -196,6 +307,7 @@ function parseCSV(text) {
 
 /* ---------- tiny Markdown renderer ---------- */
 function escapeHtml(s){ return (s==null?"":String(s)).replace(/[&<>]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[m])); }
+function escapeAttr(s){ return escapeHtml(s).replace(/"/g,"&quot;"); }
 function inline(s) {
   s = escapeHtml(s);
   s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
@@ -252,9 +364,12 @@ function renderLeads(file, headers, data) {
   const iName=H(/business_name|^name/i), iPri=H(/^priority$/i), iScore=H(/opportunity_score|score/i),
         iSvc=H(/recommended_service|suggested_service|service/i), iPhone=H(/phone/i), iEmail=H(/email/i),
         iContact=H(/contact_name/i), iSite=H(/website|site/i), iSum=H(/sales_summary|sales_note|summary/i),
-        iAddr=H(/address/i), iLink=H(/linkedin/i);
+        iAddr=H(/address/i), iLink=H(/linkedin/i), iTitle=H(/contact_title/i);
   const get=(d,i)=> i>=0 ? (d[headers[i]]||"") : "";
   const meta = titleFromPath(file.path);
+  // Stable per-lead key shared by the dashboard cards and the table, so notes/status line up.
+  const keyOf = d => leadKey(get(d,iName), get(d,iPhone)||get(d,iSite)||get(d,iAddr));
+  const updateWorktrack = () => { const bar=document.querySelector("#main #wtrack"); if(bar) bar.innerHTML=buildWorktrack(data, keyOf); };
 
   const counts={Hot:0,Warm:0,Cold:0};
   data.forEach(d=>{ const k=get(d,iPri); const key=k?k[0].toUpperCase()+k.slice(1).toLowerCase():"Warm"; if(counts[key]!=null)counts[key]++; });
@@ -275,14 +390,15 @@ function renderLeads(file, headers, data) {
   const hMax = Math.max(1, ...buckets);
   const bColor = b => b>=8? "var(--hot)" : b>=5? "var(--accent)" : "var(--cold)";
 
-  // top opportunities
-  const top = [...data].map(d=>({d, s:parseFloat(get(d,iScore))||0})).sort((a,b)=>b.s-a.s).slice(0,6);
+  // every lead as a card, best score first
+  const top = [...data].map(d=>({d, s:parseFloat(get(d,iScore))||0})).sort((a,b)=>b.s-a.s);
 
   const banner = placeholder/Math.max(1,data.length) > 0.5
     ? `<div class="banner">⚠ <strong>This looks like placeholder data.</strong> ${placeholder} of ${data.length} leads weren't actually scored by the AI (they show a default "Warm / 50"). Re-run with a funded API key for real Hot/Warm/Cold analysis.</div>` : "";
 
   const dash = `
     ${banner}
+    <div class="worktrack" id="wtrack"></div>
     <div class="tiles">
       <div class="tile"><div class="n">${data.length}</div><div class="l">Total leads</div></div>
       <div class="tile hot"><div class="n">${counts.Hot}</div><div class="l">🔥 Hot</div></div>
@@ -308,57 +424,116 @@ function renderLeads(file, headers, data) {
     ${svcTop.length? `<div class="panel" style="margin-bottom:18px"><h3>Recommended services</h3>
       ${svcTop.map(([s,n])=>`<div class="hbar"><div class="row"><span>${escapeHtml(s)}</span><span>${n}</span></div><div class="track"><i style="width:${Math.round(100*n/svcMax)}%"></i></div></div>`).join("")}
     </div>`:""}
-    <h3 style="text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-size:14px">Top opportunities</h3>
+    <h3 style="text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-size:14px">All opportunities (${data.length}) — ranked best first</h3>
     <div class="opps">${top.map(({d,s})=>{
-      const cls=pclass(get(d,iPri)), phone=get(d,iPhone), email=get(d,iEmail), site=get(d,iSite);
-      return `<div class="opp ${cls}">
+      const cls=pclass(get(d,iPri)), phone=get(d,iPhone), email=get(d,iEmail), site=get(d,iSite),
+            cname=get(d,iContact), ctitle=get(d,iTitle), link=get(d,iLink), addr=get(d,iAddr),
+            key=keyOf(d), nt=getNote(key);
+      return `<div class="opp ${cls}" data-status="${escapeAttr(nt.status)}">
         <span class="score-pill ${cls}">${s||"—"}</span>
         <div class="nm">${escapeHtml(get(d,iName))||"(unnamed)"}</div>
         <div class="sub">${escapeHtml(get(d,iSvc))||"—"} · <span class="badge ${cls}">${escapeHtml(get(d,iPri)||"—")}</span></div>
-        <div class="sum">${escapeHtml((get(d,iSum)||"").slice(0,160))}</div>
+        ${(cname||ctitle)?`<div class="contact">👤 ${escapeHtml(cname)||"Contact"}${ctitle?` <span class="ttl">— ${escapeHtml(ctitle)}</span>`:""}</div>`:""}
+        <div class="sum">${escapeHtml((get(d,iSum)||"").slice(0,220))}</div>
         <div class="acts">
           ${phone?`<a class="chip" href="tel:${escapeHtml(phone.replace(/[^+\d]/g,""))}">📞 ${escapeHtml(phone)}</a>`:""}
           ${email?`<a class="chip" href="mailto:${escapeHtml(email)}">✉ email</a>`:""}
           ${site?`<a class="chip" href="${escapeHtml(/^https?:/.test(site)?site:"https://"+site)}" target="_blank" rel="noopener">🌐 site</a>`:""}
+          ${addr?`<a class="chip" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank" rel="noopener">📍 map</a>`:""}
+          ${link?`<a class="chip" href="${escapeHtml(/^https?:/.test(link)?link:"https://"+link)}" target="_blank" rel="noopener">in LinkedIn</a>`:""}
+        </div>
+        <div class="note-wrap">
+          <div class="note-row"><span class="lbl">Status</span>
+            <select class="status-sel" data-key="${escapeAttr(key)}">${statusOptions(nt.status)}</select></div>
+          <textarea class="note-in" data-key="${escapeAttr(key)}" rows="1" placeholder="Add a note…">${escapeHtml(nt.note)}</textarea>
         </div></div>`; }).join("")}</div>`;
 
-  // table view (sortable / filterable)
+  // table view (sortable / filterable, with per-lead status + notes)
   function tableView(container) {
-    container.innerHTML = `<div class="toolbar">
+    const colIds=[...headers,"__status","__notes"];
+    container.innerHTML = `<div class="worktrack" id="wtrack"></div>
+      <div class="toolbar">
         <input type="search" id="q" placeholder="Filter ${data.length} leads…" />
-        <button class="btn ghost" id="dl">⬇ Download filtered CSV</button>
-        <span class="count" id="cnt"></span></div>
-      <div style="overflow:auto"><table id="tbl"><thead><tr>${
-        headers.map((h,j)=>`<th data-j="${j}">${escapeHtml(h)} <span class="arrow"></span></th>`).join("")
-      }</tr></thead><tbody></tbody></table></div>`;
+        <button class="btn ghost" id="dl">⬇ Download CSV (with notes)</button>
+        <button class="btn ghost" id="rw" title="Reset all column widths">↔ Reset widths</button>
+        <span class="count" id="cnt"></span>
+        <span class="savehint">📝 drag a column edge to resize · notes &amp; status auto-save</span></div>
+      <div class="tablewrap"><table id="tbl">
+        <colgroup id="cg">${colIds.map((_,i)=>`<col data-ci="${i}">`).join("")}</colgroup>
+        <thead><tr>${
+        headers.map((h,j)=>`<th data-j="${j}" data-ci="${j}">${escapeHtml(h)} <span class="arrow"></span><span class="col-resizer" data-ci="${j}"></span></th>`).join("")
+      }<th class="colStatus" data-ci="${headers.length}">Status<span class="col-resizer" data-ci="${headers.length}"></span></th><th class="colNotes" data-ci="${headers.length+1}">Notes<span class="col-resizer" data-ci="${headers.length+1}"></span></th></tr></thead><tbody></tbody></table></div>`;
+    container.__sized = false;
     let sortJ = iScore>=0?iScore:-1, sortDir=-1, filter="";
     const numeric = j => data.every(d => d[headers[j]]==="" || !isNaN(parseFloat(d[headers[j]])));
+    const esc = v => /[",\n]/.test(v)?'"'+String(v).replace(/"/g,'""')+'"':v;
+    // Long, sentence-like columns wrap to a sane width; short columns keep natural width.
+    const wrapCol = headers.map(h=>/explanation|summary|sales_note|note|next_action|action|description|amenities|reason/i.test(h));
     let view = data;
     function compute(){ view = data;
-      if (filter){ const f=filter.toLowerCase(); view=view.filter(d=>headers.some(h=>(d[h]||"").toLowerCase().includes(f))); }
+      if (filter){ const f=filter.toLowerCase(); view=view.filter(d=>headers.some(h=>(d[h]||"").toLowerCase().includes(f)) || (getNote(keyOf(d)).note||"").toLowerCase().includes(f)); }
       if (sortJ>=0){ const h=headers[sortJ], num=numeric(sortJ);
         view=[...view].sort((a,b)=>{ let x=a[h],y=b[h]; if(num){x=parseFloat(x)||0;y=parseFloat(y)||0;return (x-y)*sortDir;} return x.localeCompare(y)*sortDir; }); } }
     function draw(){ compute();
-      container.querySelector("#tbl tbody").innerHTML = view.map(d=>"<tr>"+headers.map((h,j)=>{
-        let v=d[h]??"";
-        if(j===iPri) return `<td><span class="badge ${pclass(v)}">${escapeHtml(v||"—")}</span></td>`;
-        if(j===iScore && v!==""){ const n=Math.max(0,Math.min(100,parseFloat(v)||0));
-          return `<td><div class="scorewrap"><b>${escapeHtml(v)}</b><div class="scorebar"><i style="width:${n}%"></i></div></div></td>`; }
-        if(/^https?:\/\//i.test(v)) return `<td><a href="${escapeHtml(v)}" target="_blank" rel="noopener">${escapeHtml(v.replace(/^https?:\/\/(www\.)?/,""))}</a></td>`;
-        if(j===iEmail && /@/.test(v)) return `<td><a href="mailto:${escapeHtml(v)}">${escapeHtml(v)}</a></td>`;
-        if(j===iPhone && v) return `<td><a href="tel:${escapeHtml(v.replace(/[^+\d]/g,""))}">${escapeHtml(v)}</a></td>`;
-        return `<td class="${numeric(j)&&v!==''?'num':''}">${escapeHtml(v)}</td>`;
-      }).join("")+"</tr>").join("");
+      container.querySelector("#tbl tbody").innerHTML = view.map(d=>{
+        const key=keyOf(d), nt=getNote(key);
+        const cells=headers.map((h,j)=>{
+          let v=d[h]??"";
+          if(j===iPri) return `<td><span class="badge ${pclass(v)}">${escapeHtml(v||"—")}</span></td>`;
+          if(j===iScore && v!==""){ const n=Math.max(0,Math.min(100,parseFloat(v)||0));
+            return `<td><div class="scorewrap"><b>${escapeHtml(v)}</b><div class="scorebar"><i style="width:${n}%"></i></div></div></td>`; }
+          if(j===iAddr && v) return `<td><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v)}" target="_blank" rel="noopener" title="Open in Google Maps">📍 ${escapeHtml(v)}</a></td>`;
+          if(/^https?:\/\//i.test(v)) return `<td><a href="${escapeHtml(v)}" target="_blank" rel="noopener">${escapeHtml(v.replace(/^https?:\/\/(www\.)?/,""))}</a></td>`;
+          if(j===iEmail && /@/.test(v)) return `<td><a href="mailto:${escapeHtml(v)}">${escapeHtml(v)}</a></td>`;
+          if(j===iPhone && v) return `<td><a href="tel:${escapeHtml(v.replace(/[^+\d]/g,""))}">${escapeHtml(v)}</a></td>`;
+          if(wrapCol[j] && v) return `<td class="wrap">${escapeHtml(v)}</td>`;
+          return `<td class="${numeric(j)&&v!==''?'num':''}">${escapeHtml(v)}</td>`;
+        }).join("");
+        const k=escapeAttr(key);
+        const statusTd=`<td><select class="status-sel" data-key="${k}">${statusOptions(nt.status)}</select></td>`;
+        const noteTd=`<td><textarea class="note-in" data-key="${k}" rows="1" placeholder="Add note…">${escapeHtml(nt.note)}</textarea></td>`;
+        return `<tr data-status="${escapeAttr(nt.status)}">${cells}${statusTd}${noteTd}</tr>`;
+      }).join("");
       container.querySelector("#cnt").textContent = `${view.length} of ${data.length} shown`;
       container.querySelectorAll("#tbl th .arrow").forEach((a,j)=> a.textContent = j===sortJ?(sortDir>0?"▲":"▼"):"");
+      container.querySelectorAll(".note-in").forEach(autoGrow);
+      updateWorktrack();
     }
-    container.querySelectorAll("#tbl th").forEach(th=> th.onclick=()=>{ const j=+th.dataset.j; if(sortJ===j)sortDir*=-1; else{sortJ=j;sortDir=1;} draw(); });
+    // Lock current column widths into the <colgroup> and switch to fixed layout so
+    // columns can be dragged narrower than their content (saved widths reapply here).
+    function ensureWidths(){
+      if(container.__sized) return;
+      const cols=[...container.querySelectorAll("#cg col")];
+      const ths=[...container.querySelectorAll("#tbl thead th")];
+      cols.forEach((col,i)=>{ const w=colWStore[colIds[i]]; if(w) col.style.width=w+"px"; });
+      ths.forEach((th,i)=>{ if(cols[i] && !cols[i].style.width){ cols[i].style.width=(Math.ceil(th.getBoundingClientRect().width)+8)+"px"; } });
+      container.querySelector("#tbl").classList.add("fixed");
+      container.__sized=true;
+    }
+    container.querySelectorAll("#tbl th[data-j]").forEach(th=> th.onclick=(e)=>{ if(e.target.classList.contains("col-resizer"))return; const j=+th.dataset.j; if(sortJ===j)sortDir*=-1; else{sortJ=j;sortDir=1;} draw(); });
     container.querySelector("#q").oninput = e=>{ filter=e.target.value; draw(); };
+    container.querySelector("#rw").onclick = ()=>{ colIds.forEach(id=>delete colWStore[id]); saveColWStore();
+      container.querySelectorAll("#cg col").forEach(c=>c.style.width=""); container.querySelector("#tbl").classList.remove("fixed");
+      container.__sized=false; ensureWidths(); };
     container.querySelector("#dl").onclick = ()=>{ compute();
-      const csv=[headers.join(","),...view.map(d=>headers.map(h=>{const v=(d[h]||"");return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}).join(","))].join("\n");
+      const outH=[...headers,"status","notes"];
+      const csv=[outH.join(","),...view.map(d=>{ const nt=getNote(keyOf(d));
+        return [...headers.map(h=>esc(d[h]||"")), esc(nt.status), esc(nt.note)].join(","); })].join("\n");
       const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
-      a.download="filtered-leads.csv"; a.click(); };
-    draw();
+      a.download="leads-with-notes.csv"; a.click(); };
+    if(!container.__resizeWired){ container.__resizeWired=true;
+      container.addEventListener("mousedown", e=>{ const h=e.target.closest&&e.target.closest(".col-resizer"); if(!h) return;
+        e.preventDefault(); e.stopPropagation(); ensureWidths();
+        const ci=+h.dataset.ci, col=container.querySelector('#cg col[data-ci="'+ci+'"]'); if(!col) return;
+        const startX=e.clientX, startW=parseFloat(col.style.width)||col.getBoundingClientRect().width;
+        h.classList.add("dragging"); document.body.style.cursor="col-resize"; document.body.style.userSelect="none";
+        const move=ev=>{ col.style.width=Math.max(48,Math.round(startW+(ev.clientX-startX)))+"px"; };
+        const up=()=>{ document.removeEventListener("mousemove",move); document.removeEventListener("mouseup",up);
+          h.classList.remove("dragging"); document.body.style.cursor=""; document.body.style.userSelect="";
+          colWStore[colIds[ci]]=Math.round(parseFloat(col.style.width)); saveColWStore(); };
+        document.addEventListener("mousemove",move); document.addEventListener("mouseup",up); });
+    }
+    draw(); ensureWidths();
   }
 
   const main = document.getElementById("main");
@@ -371,8 +546,11 @@ function renderLeads(file, headers, data) {
     </div>
     <div id="content"></div>`;
   const content = main.querySelector("#content");
+  wireNotes(content);
+  content.__statsUpdate = updateWorktrack;
   function show(v){ main.querySelectorAll(".views button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
-    if(v==="dash") content.innerHTML = dash; else tableView(content); }
+    if(v==="dash"){ content.innerHTML = dash; syncNotes(content); updateWorktrack(); }
+    else tableView(content); }
   main.querySelectorAll(".views button").forEach(b=> b.onclick=()=>show(b.dataset.v));
   show("dash");
 }
@@ -381,13 +559,14 @@ function renderLeads(file, headers, data) {
 function renderGenericCSV(headers, data) {
   const main = document.getElementById("main");
   main.innerHTML = `<div class="toolbar"><input type="search" id="q" placeholder="Filter ${data.length} rows…"/><span class="count" id="cnt"></span></div>
-    <div style="overflow:auto"><table id="tbl"><thead><tr>${headers.map((h,j)=>`<th data-j="${j}">${escapeHtml(h)} <span class="arrow"></span></th>`).join("")}</tr></thead><tbody></tbody></table></div>`;
+    <div class="tablewrap"><table id="tbl"><thead><tr>${headers.map((h,j)=>`<th data-j="${j}">${escapeHtml(h)} <span class="arrow"></span></th>`).join("")}</tr></thead><tbody></tbody></table></div>`;
   let sortJ=-1, sortDir=1, filter="";
   const numeric=j=>data.every(d=>d[headers[j]]===""||!isNaN(parseFloat(d[headers[j]])));
   function draw(){ let view=data;
     if(filter){const f=filter.toLowerCase();view=view.filter(d=>headers.some(h=>(d[h]||"").toLowerCase().includes(f)));}
     if(sortJ>=0){const h=headers[sortJ],num=numeric(sortJ);view=[...view].sort((a,b)=>{let x=a[h],y=b[h];if(num){x=parseFloat(x)||0;y=parseFloat(y)||0;return(x-y)*sortDir;}return x.localeCompare(y)*sortDir;});}
     document.querySelector("#tbl tbody").innerHTML=view.map(d=>"<tr>"+headers.map((h,j)=>{let v=d[h]??"";
+      if(/address/i.test(h)&&v)return`<td><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v)}" target="_blank" rel="noopener" title="Open in Google Maps">📍 ${escapeHtml(v)}</a></td>`;
       if(/^https?:\/\//i.test(v))return`<td><a href="${escapeHtml(v)}" target="_blank" rel="noopener">${escapeHtml(v.replace(/^https?:\/\/(www\.)?/,""))}</a></td>`;
       return`<td class="${numeric(j)&&v!==''?'num':''}">${escapeHtml(v)}</td>`;}).join("")+"</tr>").join("");
     document.getElementById("cnt").textContent=`${view.length} of ${data.length} shown`;
